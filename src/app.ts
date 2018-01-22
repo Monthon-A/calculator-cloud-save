@@ -2,7 +2,9 @@ import * as os from 'os'; // native node.js module
 import { remote } from 'electron'; // native electron module
 const jetpack = require('fs-jetpack'); // module loaded from npm
 import env from './env';
+import getUuid from './uuid';
 import BigNumber from 'bignumber.js';
+import $ from 'jquery';
 var app = remote.app;
 var dialog = remote.dialog;
 
@@ -31,48 +33,31 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   document.getElementById('save').addEventListener('click', function(event) {
-    dialog.showSaveDialog({ filters: [{ name: 'JSON', extensions: ['json'] }]}, function (fileName) {
-      if (fileName === undefined) return;
-      jetpack.write(fileName, {
-        a: (document.getElementById('input_a') as HTMLInputElement).value,
-        b: (document.getElementById('input_b') as HTMLInputElement).value,
-        op: currentOp,
-        result: (document.getElementById('result') as HTMLInputElement).value
+    if ((document.getElementById('result') as HTMLInputElement).value == '') {
+      dialog.showMessageBox({
+        type: 'info',
+        buttons: ['OK'],
+        title: 'Save',
+        message: 'Please do a calculation before saving.'
       });
-    }); 
+      return;
+    }
+    var isCloud = (document.getElementById('cloud_save') as HTMLInputElement).checked;
+    if (isCloud) {
+      cloudSave();
+    } else {
+      fileSave();
+    }
+    
   });
 
   document.getElementById('load').addEventListener('click', function(event) {
-    dialog.showOpenDialog({ filters: [{ name: 'JSON', extensions: ['json'] }]}, function (filePaths) {
-      if (filePaths === undefined) return;
-      var content = jetpack.read(filePaths[0], 'json') as SaveContent;
-      console.log(content);
-      var a,b;
-      try {
-        a = new BigNumber(content.a);
-        b = new BigNumber(content.b);
-      } catch (err) {
-        if (err) {
-          showLoadErrorDialog();
-          return;
-        }
-      }
-      if (a.isNaN() || b.isNaN()) {
-        showLoadErrorDialog()
-        return;
-      }
-      var op = content.op;
-      var result = calculate(a, b, op);
-      if (result == null) {
-        showLoadErrorDialog();
-        return;
-      }
-      clearHighlight();
-      document.getElementById(op).classList.add('highlight');
-      (document.getElementById('input_a') as HTMLInputElement).value = a.toString();
-      (document.getElementById('input_b') as HTMLInputElement).value = b.toString();
-      (document.getElementById('result') as HTMLInputElement).value = result.toString();
-    });
+    var isCloud = (document.getElementById('cloud_save') as HTMLInputElement).checked;
+    if (isCloud) {
+      cloudLoad();
+    } else {
+      fileLoad();
+    }
   });
 });
 
@@ -92,6 +77,7 @@ function clearHighlight() {
   for (var i=0; i<inputs.length; i++) {
     inputs[i].classList.remove('highlight');
   }
+  currentOp = null;
 }
 
 function calculate(a: BigNumber, b: BigNumber, op: string): BigNumber {
@@ -110,3 +96,98 @@ function calculate(a: BigNumber, b: BigNumber, op: string): BigNumber {
   return null;
 }
 
+function fileSave() {
+  dialog.showSaveDialog({ filters: [{ name: 'JSON', extensions: ['json'] }]}, function (fileName) {
+    if (fileName === undefined) return;
+    jetpack.write(fileName, {
+      a: (document.getElementById('input_a') as HTMLInputElement).value,
+      b: (document.getElementById('input_b') as HTMLInputElement).value,
+      op: currentOp,
+      result: (document.getElementById('result') as HTMLInputElement).value
+    });
+  }); 
+}
+
+function fileLoad() {
+  dialog.showOpenDialog({ filters: [{ name: 'JSON', extensions: ['json'] }]}, function (filePaths) {
+    if (filePaths === undefined) return;
+    var content = jetpack.read(filePaths[0], 'json') as SaveContent;
+    console.log(content);
+    var a,b;
+    try {
+      a = new BigNumber(content.a);
+      b = new BigNumber(content.b);
+    } catch (err) {
+      if (err) {
+        showLoadErrorDialog();
+        return;
+      }
+    }
+    if (a.isNaN() || b.isNaN()) {
+      showLoadErrorDialog()
+      return;
+    }
+    var op = content.op;
+    var result = calculate(a, b, op);
+    if (result == null) {
+      showLoadErrorDialog();
+      return;
+    }
+    clearHighlight();
+    document.getElementById(op).classList.add('highlight');
+    (document.getElementById('input_a') as HTMLInputElement).value = a.toString();
+    (document.getElementById('input_b') as HTMLInputElement).value = b.toString();
+    (document.getElementById('result') as HTMLInputElement).value = result.toString();
+  });
+}
+
+function cloudSave() {
+  var content = {
+    id: getUuid(),
+    a: (document.getElementById('input_a') as HTMLInputElement).value,
+    b: (document.getElementById('input_b') as HTMLInputElement).value,
+    op: currentOp,
+    result: (document.getElementById('result') as HTMLInputElement).value
+  }
+  $.post('https://y400gq05ah.execute-api.us-east-2.amazonaws.com/calc/data', JSON.stringify(content))
+    .done(function(data) {
+      dialog.showMessageBox({
+        type: 'info',
+        buttons: ['OK'],
+        title: 'Cloud Save',
+        message: 'Save to cloud completed successfully.'
+      });
+    })
+    .fail(function(error) {
+      dialog.showErrorBox('Error', 'Cannot save to cloud.');
+    });
+}
+
+function cloudLoad() {
+  $.get('https://y400gq05ah.execute-api.us-east-2.amazonaws.com/calc/data/' + getUuid())
+    .done(function(data) {
+      if ($.isEmptyObject(data)) {
+        dialog.showMessageBox({
+          type: 'info',
+          buttons: ['OK'],
+          title: 'Cloud Load',
+          message: 'No data found.'
+        });
+      } else {
+        clearHighlight();
+        document.getElementById(data.op).classList.add('highlight');
+        (document.getElementById('input_a') as HTMLInputElement).value = data.a;
+        (document.getElementById('input_b') as HTMLInputElement).value = data.b;
+        (document.getElementById('result') as HTMLInputElement).value = data.result;
+        dialog.showMessageBox({
+          type: 'info',
+          buttons: ['OK'],
+          title: 'Cloud Load',
+          message: 'Cloud data loaded.'
+        });
+      }
+    })
+    .fail(function(data) {
+      dialog.showErrorBox('Error', 'Cannot load data from cloud.');
+    });
+}

@@ -1,7 +1,7 @@
 {
-  "name": "electron-basic-calculator",
-  "productName": "Basic Calculator on Electron",
-  "description": "Starter for your Electron application",
+  "name": "calculator-cloud-save",
+  "productName": "Calculator on Electron with Cloud Save",
+  "description": "Calculator on Electron with cloud save using AWS.",
   "version": "0.0.1",
   "author": "Monthon",
   "license": "MIT",
@@ -24,11 +24,14 @@
   "dependencies": {
     "bignumber.js": "^5.0.0",
     "fs-jetpack": "^0.10.2",
+    "jquery": "^3.3.1",
     "run-sequence": "^1.2.2",
-    "typescript": "^2.2.1"
+    "typescript": "^2.2.1",
+    "uuid": "^3.2.1"
   },
   "devDependencies": {
     "@types/electron": "^1.4.33",
+    "@types/jquery": "^3.2.18",
     "@types/node": "^7.0.7",
     "electron": "^1.4.7",
     "electron-builder": "^8.6.0",
