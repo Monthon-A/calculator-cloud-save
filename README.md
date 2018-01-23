@@ -1,6 +1,5 @@
-# electron-basic-calculator
+# calculator-cloud-save
 Basic calculator on Electron with save/load to file or cloud (AWS).
-Source codes for AWS Lambda are in ```lambda/``` 
 ### Installation
 ```sh
 $ npm install
